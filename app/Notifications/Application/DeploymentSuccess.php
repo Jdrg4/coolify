@@ -11,6 +11,7 @@ use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use App\Traits\IncludesDeploymentCommitDetails;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Str;
 
 class DeploymentSuccess extends CustomEmailNotification
 {
@@ -136,6 +137,7 @@ class DeploymentSuccess extends CustomEmailNotification
                 ];
             }
         }
+        $message .= $this->commitDetailsForTelegram();
         $buttons[] = [
             'text' => 'Deployment logs',
             'url' => $this->deployment_url,
@@ -147,6 +149,36 @@ class DeploymentSuccess extends CustomEmailNotification
                 ...$buttons,
             ],
         ];
+    }
+
+    /**
+     * The deployed commit, so the chat shows what actually changed: short hash,
+     * branch and the subject line of the commit message.
+     */
+    private function commitDetailsForTelegram(): string
+    {
+        $lines = [];
+
+        if (filled($this->commit_sha)) {
+            $line = '🏷 '.substr($this->commit_sha, 0, 7);
+            if (filled($this->commit_branch)) {
+                $line .= ' · '.$this->commit_branch;
+            }
+            $lines[] = $line;
+        }
+
+        if (filled($this->commit_message)) {
+            $subject = trim((string) preg_split('/\R/u', (string) $this->commit_message)[0]);
+            if ($subject !== '') {
+                $lines[] = '📝 '.Str::limit($subject, 160, '…');
+            }
+        }
+
+        if ($lines === []) {
+            return '';
+        }
+
+        return "\n\n".implode("\n", $lines);
     }
 
     public function toPushover(): PushoverMessage
